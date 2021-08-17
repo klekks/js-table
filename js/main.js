@@ -509,21 +509,81 @@ var json_tmp = `[
 
 window.onload = function () {
   window.onresize = function() {if (window.innerWidth < 1280) alert("Width of your screen is too small.");}
-  if (window.innerWidth < 1280) alert("Width of your screen is too small.");
+  if (!/Chrome/.test(navigator.userAgent)) alert("Your browser is not supported");
+  if (window.innerWidth < 1450) alert("Width of your screen is too small.");
   data = JSON.parse(json_tmp);
   tbl_parent = document.getElementById("table-container");
+  form_parent = document.getElementById("form-container");
   tbl = new Table(tbl_parent,
                   {"class": "table"},
                   [
                     {label: "First Name", key: "firstName"},
-                    {label: "Last Name", key: "secondName"},
+                    {label: "Last Name", key: "lastName"},
                     {label: "About", key: "about"},
                     {label: "Eye Colour", key: "eyeColor"}
                   ],
-                  [5, 10, 15]
+                  [5, 7, 10, 15, 50],
+                  form_parent
                 );
 
   for (i in data)
     tbl.add_row({firstName: data[i].name.firstName, lastName: data[i].name.lastName, about: data[i].about, eyeColor: data[i].eyeColor});
   tbl.put();
+
+  setInterval(function settings() {
+    document.querySelector("thead").onclick = function(event) {
+      if (event.path[0].tagName != "THEAD") return;
+      var background = document.createElement("div");
+      setAttribute(background, "id", "background");
+      background.onclick = function(event) {
+        if (event.path[0].tagName == "DIV")
+          this.remove()
+      };
+      var body = document.getElementsByTagName("body")[0];
+      body.appendChild(background);
+
+      var form = document.createElement("div");
+      setAttribute(form, "id", "hideform");
+
+      var selector = document.createElement("select");
+      var button = document.createElement("input");
+      setAttribute(button, "type", "button");
+      button.onclick = function() {
+        tbl.toggle_column(selector.value);
+        background.click();
+      };
+
+
+      setAttribute(selector, "id", "hide-selector");
+      for (let i in tbl.columns) {
+        let option = document.createElement("option");
+        setAttribute(option, "value", i);
+        option.innerText = tbl.columns[i].label;
+        selector.appendChild(option);
+      }
+      selector.onchange = function() {
+        if (tbl.columns[this.value].hidden == true)
+          button.value = "Show";
+        else
+          button.value = "Hide";
+      };
+      selector.onchange(selector);
+
+      var label = document.createElement("label");
+      setAttribute(button, "for", "hide-selector");
+      label.innerText = "Select column name: "
+
+      form.appendChild(label);
+      form.appendChild(selector);
+      form.appendChild(button);
+      background.appendChild(form);
+    };
+  }, 1000);
+
+  setInterval(function() {
+    let colors = document.querySelectorAll('tbody td[key="eyeColor"]');
+    colors.forEach(function(a) {a.setAttribute("style", `color: ${a.innerText};`)});
+    colors = document.querySelectorAll('input[name="eyeColor"]');
+    colors.forEach(function(a) {a.setAttribute("style", `color: ${a.value};`)});
+  }, 200);
 }
