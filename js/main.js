@@ -5,13 +5,13 @@ function getRandomInt(max) {
 window.onload = function () {
   window.onresize = function() { // призываем смотреть на большом экране
     if (window.innerWidth < 1430) // чтобы разметка не поплыла
-    alert("Width of your screen is too small.");
+    console.log("Width of your screen is too small.");
   }
   if (window.innerWidth < 1430)
     alert("Width of your screen is too small.");
 
   if (!/Chrome/.test(navigator.userAgent))
-    alert("Your browser is not supported"); // заботимся о красоте сайта, ибо
+    alert("Your browser may be not supported"); // заботимся о красоте сайта, ибо
                                             // не весь css общеупотребим
 
   tbl_parent = document.getElementById("table-container"); // контейнер для таблицы
