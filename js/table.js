@@ -11,138 +11,6 @@ function min (a, b) {
   return a > b ? b : a;
 }
 
-class Row {
-  constructor(table, // тэг таблицы, в который будет добавлена строка
-              keys,  // уникальные имена полей
-              values // значения полей
-              ) {
-    this.table = table; // Table object
-    this.id = 'row-' + getRandomInt(2**32);
-    this.keys = keys;
-    this.values = values;
-    this._parse_values();
-  }
-
-  _parse_values() {
-    for (let i in this.keys)
-      this[this.keys[i]] = this.values[i];
-  }
-
-  set(key, value, update=true) {
-    this.add_column(key, value);
-    if (update) this.update();
-  }
-
-  update() {
-    for (var i in this.keys) { // проходим по всем ячейкам строки
-      let td = document.getElementById(`${this.id}-${this.keys[i]}`);
-      if (td)
-        td.innerHTML = `<p>${this[this.keys[i]]}</p>`; // ставим обнолвенные значения
-    }
-    this.onupdate();
-  }
-
-  update_value(key, value) {
-    this.values[this.keys.indexOf(key)] = value; // изменяем значение в списке значений
-    this[key] = value; // изменяем значение по ключу
-    this.update(); // обновляем уже отрисованную таблицу
-  }
-
-  has_key(key) {
-    return this.keys.includes(key);
-  }
-
-  /*
-    Вставляет пару ключ-значение в списки значений
-    и добавляет значение по ключу
-  */
-  _insert_value(key, value, after=false) {
-    var after_ind = this.keys.indexOf(after);
-    this.keys.splice(after_ind + 1, 0, key);
-    this.values.splice(after_ind + 1, 0, value);
-    this[key] = value;
-  }
-
-  /*
-    Добавляет новое поле (колонку)
-    после элемента с ключем $after
-  */
-  add_column(key, value, after=false) {
-    if (this.has_key(key))
-      return this.update_value(key, value);
-    this._insert_value(key, value, after);
-  }
-
-  /*
-    Генерирует HTML элемент строки
-  */
-
-  to_html(keys) {
-    var tr = document.createElement("tr");
-    setAttribute(tr, "id", this.id);
-    setAttribute(tr, "class", this.table.id);
-
-    var selected_keys = this.keys;  // по умолчанию добавляются все поля (колонки)
-    if (keys) selected_keys = keys; // если передан список полей, то заполняет по списку
-
-
-    for (let i in selected_keys) {
-      let td = document.createElement("td");
-      setAttribute(td, "id", `${this.id}-${selected_keys[i]}`); // уникальный id
-      setAttribute(td, "key", `${selected_keys[i]}`); // при наличии ключа в явном виде проще работать со строкой
-      td.innerHTML = `<p>${this[selected_keys[i]]}</p>`; // значение поля
-      td.onclick = this.onclick_td; // подвязываем callback ячейки
-      tr.appendChild(td); // добавляем ячейку в строку
-    }
-
-    tr.onclick = this.onclick; // подвязываем callback строки
-    return tr;
-  }
-
-  /*
-    Генерирует форму редактирования строки
-  */
-  editing_form(keys) {
-    var form = document.getElementById(`edit-${this.id}`);
-    if (form) form.remove();  // если уже есть форма, то ее удаляем
-
-    form = document.createElement('form');
-    setAttribute(form, "id", `edit-${this.id}`); //уникальный id формы
-
-    if (!keys) keys = this.keys; // если не передан список ключей, то используем все
-
-    for (let i in keys) {
-      let inp = document.createElement('input'); // для кажого из полей создает input
-      setAttribute(inp, 'type', 'text');
-      setAttribute(inp, 'name', keys[i]); // когда name=key удобно обращаться из внешнего js
-      setAttribute(inp, 'class', `edit-${this.id}`);
-      setAttribute(inp, 'palceholder', `Enter ${keys[i]}`);
-      setAttribute(inp, 'value', this[keys[i]] ? this[keys[i]] : '');
-      form.appendChild(inp);
-    }
-    let sbmt = document.createElement('input'); // конпка сохранения формы
-    setAttribute(sbmt, 'type', 'button');
-    setAttribute(sbmt, 'value', 'Save');
-    setAttribute(sbmt, 'row-id', `${this.id}`);
-
-    var this_row = this; // чтобы попасть в видимость функции ниже
-    sbmt.onclick = function() {
-      var form = document.getElementById(`edit-${this_row.id}`); // форма редактирования
-      var inputs = document.getElementsByClassName(`edit-${this_row.id}`); // inputы полей
-      for (let i = 0; i < inputs.length; i++) {
-        this_row.set(inputs[i].name, inputs[i].value, true); // обновляем значениями из формы
-      }
-      form.remove(); // убираем форму, т.к. сохранили её
-    }
-    form.appendChild(sbmt);
-    return form;
-  }
-
-  onclick_td = function(){};
-  onclick = function(){};
-  onupdate = function(){};
-}
-
 class Table {
   constructor(
     parent,    // элемент, в который будет помещена таблица
@@ -187,6 +55,12 @@ class Table {
       values.push(obj[key]);
     }
     let row = new Row(this.table, keys, values); // создаем объект строки
+    var this_table = this; // чтобы попасть в область видимости
+    row.onedit = function() { // если столбец обновился
+      if (this_table.sorted_by) // а таблица отсортирована
+        this_table.sort_by(this_table.sorted_by, false); // то ее нужно пересортировать, т.к. ключ мог изменится
+                                                        // false === NO_REVERSE (не меняем направления сортировки)
+      }
     this.rows.push(row); // добавляем его в список строк
     this.rows_count++;
   }
@@ -321,15 +195,20 @@ class Table {
 /*
   Сортирует таблицу по заданному ключу
 */
-  sort_by(key) {
-      this._toggle_sort(key);
+  sort_by(key, reverse = true) {
+      this.sorted_by = key;
+      if (reverse) // меняем направление сортировки, если иное не задано
+        this._toggle_sort(key);
 
       var sorted = this.columns[key].sorted; //проверяет используется прямой или обратный порядок сортировки
 
       var key = key; //?
-      this.rows = this.rows.sort(function(a, b) {
-        return a[key] > b[key] ? 1 : a[key] == b[key] ? 0 : -1; // сравнение строк не совсем тривиально
-      });
+      if (this.columns[key].sort_func) // если была передана функция сортрровки для столбца
+        this.rows = this.rows.sort(this.columns[key].sort_func);
+      else
+        this.rows = this.rows.sort(function (a, b) {
+          return a[key] > b[key] ? 1 : a[key] == b[key] ? 0 : -1;
+        });
       if (sorted == -1) this.rows = this.rows.reverse(); // если сортировка обратная, разворачивает массив
       this.put(); // обновляет таблицу
   }
@@ -563,6 +442,16 @@ class Table {
     return form;
   }
 
+_too_many_columns_hidden() {
+  var unhidden_columns_count = 0;
+  for (var key in this.columns)
+    if (!this.columns[key].hidden) unhidden_columns_count++;
+
+  if (unhidden_columns_count > 1) return false;
+  else return true; // можем скрывать до того момета, как останется одна колонка
+  // иначе таблица пуста и нам нечего показывать
+}
+
   _hide_column_selector() {
     var selector = document.createElement("select");
     var button = document.createElement("input");
@@ -583,10 +472,17 @@ class Table {
       selector.appendChild(option);
     }
     selector.onchange = function() {
+      if (this_table._too_many_columns_hidden() // слишком много столбцов спрятано (остался один)
+          && this_table.columns[this.value].hidden == false) { //и этот последний столбец пытаются спрятать
+        button.disabled = true; // не даем такую возможность
+        button.value = "Too many columns are hidden"; // извиняемся
+        return;
+      }
       if (this_table.columns[this.value].hidden == true)
         button.value = "Show";
       else
         button.value = "Hide";
+      button.disabled = false; // разблокируем кнопку, если можно совершать операцию
     };
     selector.onchange(selector);
 
@@ -602,4 +498,138 @@ class Table {
 
   beforehidecolumn = function(){};
   hide_column_container = null;
+}
+
+class Row {
+  constructor(table, // тэг таблицы, в который будет добавлена строка
+              keys,  // уникальные имена полей
+              values // значения полей
+              ) {
+    this.table = table;
+    this.id = 'row-' + getRandomInt(2**32);
+    this.keys = keys;
+    this.values = values;
+    this._parse_values();
+  }
+
+  _parse_values() {
+    for (let i in this.keys)
+      this[this.keys[i]] = this.values[i];
+  }
+
+  set(key, value, update=true) {
+    this.add_column(key, value);
+    if (update) this.update();
+  }
+
+  update() {
+    for (var i in this.keys) { // проходим по всем ячейкам строки
+      let td = document.getElementById(`${this.id}-${this.keys[i]}`);
+      if (td)
+        td.innerHTML = `<p>${this[this.keys[i]]}</p>`; // ставим обнолвенные значения
+    }
+    this.onupdate();
+  }
+
+  update_value(key, value) {
+    this.values[this.keys.indexOf(key)] = value; // изменяем значение в списке значений
+    this[key] = value; // изменяем значение по ключу
+    this.update(); // обновляем уже отрисованную таблицу
+  }
+
+  has_key(key) {
+    return this.keys.includes(key);
+  }
+
+  /*
+    Вставляет пару ключ-значение в списки значений
+    и добавляет значение по ключу
+  */
+  _insert_value(key, value, after=false) {
+    var after_ind = this.keys.indexOf(after);
+    this.keys.splice(after_ind + 1, 0, key);
+    this.values.splice(after_ind + 1, 0, value);
+    this[key] = value;
+  }
+
+  /*
+    Добавляет новое поле (колонку)
+    после элемента с ключем $after
+  */
+  add_column(key, value, after=false) {
+    if (this.has_key(key))
+      return this.update_value(key, value);
+    this._insert_value(key, value, after);
+  }
+
+  /*
+    Генерирует HTML элемент строки
+  */
+
+  to_html(keys) {
+    var tr = document.createElement("tr");
+    setAttribute(tr, "id", this.id);
+    setAttribute(tr, "class", this.table.id);
+
+    var selected_keys = this.keys;  // по умолчанию добавляются все поля (колонки)
+    if (keys) selected_keys = keys; // если передан список полей, то заполняет по списку
+
+
+    for (let i in selected_keys) {
+      let td = document.createElement("td");
+      setAttribute(td, "id", `${this.id}-${selected_keys[i]}`); // уникальный id
+      setAttribute(td, "key", `${selected_keys[i]}`); // при наличии ключа в явном виде проще работать со строкой
+      td.innerHTML = `<p>${this[selected_keys[i]]}</p>`; // значение поля
+      td.onclick = this.onclick_td; // подвязываем callback ячейки
+      tr.appendChild(td); // добавляем ячейку в строку
+    }
+
+    tr.onclick = this.onclick; // подвязываем callback строки
+    return tr;
+  }
+
+  /*
+    Генерирует форму редактирования строки
+  */
+  editing_form(keys) {
+    var form = document.getElementById(`edit-${this.id}`);
+    if (form) form.remove();  // если уже есть форма, то ее удаляем
+
+    form = document.createElement('form');
+    setAttribute(form, "id", `edit-${this.id}`); //уникальный id формы
+
+    if (!keys) keys = this.keys; // если не передан список ключей, то используем все
+
+    for (let i in keys) {
+      let inp = document.createElement('input'); // для кажого из полей создает input
+      setAttribute(inp, 'type', 'text');
+      setAttribute(inp, 'name', keys[i]); // когда name=key удобно обращаться из внешнего js
+      setAttribute(inp, 'class', `edit-${this.id}`);
+      setAttribute(inp, 'palceholder', `Enter ${keys[i]}`);
+      setAttribute(inp, 'value', this[keys[i]] ? this[keys[i]] : '');
+      form.appendChild(inp);
+    }
+    let sbmt = document.createElement('input'); // конпка сохранения формы
+    setAttribute(sbmt, 'type', 'button');
+    setAttribute(sbmt, 'value', 'Save');
+    setAttribute(sbmt, 'row-id', `${this.id}`);
+
+    var this_row = this; // чтобы попасть в видимость функции ниже
+    sbmt.onclick = function() {
+      var form = document.getElementById(`edit-${this_row.id}`); // форма редактирования
+      var inputs = document.getElementsByClassName(`edit-${this_row.id}`); // inputы полей
+      for (let i = 0; i < inputs.length; i++) {
+        this_row.set(inputs[i].name, inputs[i].value, true); // обновляем значениями из формы
+      }
+      form.remove(); // убираем форму, т.к. сохранили её
+      this_row.onedit(); //чтобы сохранилась сортировка в случае чего
+    }
+    form.appendChild(sbmt);
+    return form;
+  }
+
+  onclick_td = function(){};
+  onclick = function(){};
+  onupdate = function(){};
+  onedit = function(){};
 }

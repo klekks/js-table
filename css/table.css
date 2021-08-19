@@ -24,7 +24,7 @@
   width: 1%; // The columns become equal in width
 }
 
-.table td p {
+.table td[key="about"] p {
   text-overflow: ellipsis;
   overflow: hidden;
   display: -webkit-box;
