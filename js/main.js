@@ -52,11 +52,7 @@ window.onload = function () {
   };
 
 
-  tbl.onupdate = function() { // после каждого обновления таблицы
-    let colors = document.querySelectorAll('tbody td[key="eyeColor"]'); // делаем текст столбца "eyeColor"
-    colors.forEach(function(a) {a.setAttribute("style", `color: ${a.innerText};`)}); // css стилем
-
-  }
+  tbl.onupdate = show_colors;
 
   for (i in data) // в цикле добавляем строки с данными
     tbl.add_row(  // В СООТВЕТСТВИИ С ПЕРЕДАННЫМИ key (-s)
@@ -68,4 +64,9 @@ window.onload = function () {
       });
 
   tbl.put(); // выводим таблицу
+}
+
+function show_colors() { // после каждого обновления таблицы
+    let colors = document.querySelectorAll('tbody td[key="eyeColor"]'); // делаем текст столбца "eyeColor"
+    colors.forEach(function(a) {a.setAttribute("style", `color: ${a.innerText};`)}); // css стилем
 }
