@@ -55,6 +55,7 @@ class Table {
       values.push(obj[key]);
     }
     let row = new Row(this.table, keys, values); // создаем объект строки
+    row.onupdate = this.onupdate;
     var this_table = this; // чтобы попасть в область видимости
     row.onedit = function() { // если столбец обновился
       if (this_table.sorted_by) // а таблица отсортирована
@@ -623,6 +624,7 @@ class Row {
       }
       form.remove(); // убираем форму, т.к. сохранили её
       this_row.onedit(); //чтобы сохранилась сортировка в случае чего
+      //this.onupdate();
     }
     form.appendChild(sbmt);
     return form;

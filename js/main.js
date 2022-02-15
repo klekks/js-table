@@ -67,6 +67,7 @@ window.onload = function () {
 }
 
 function show_colors() { // после каждого обновления таблицы
+  console.log("Show colors");
     let colors = document.querySelectorAll('tbody td[key="eyeColor"]'); // делаем текст столбца "eyeColor"
     colors.forEach(function(a) {a.setAttribute("style", `color: ${a.innerText};`)}); // css стилем
 }
